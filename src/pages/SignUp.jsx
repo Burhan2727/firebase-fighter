@@ -1,15 +1,28 @@
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import MyContainer from "../components/MyContainer";
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import { auth } from "../firebase/firebase.config";
 import { toast } from "react-toastify";
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { FaEye } from "react-icons/fa";
 import { FaEyeSlash } from "react-icons/fa6";
+import { AuthContext } from "../context/AuthContext";
+import { sendEmailVerification, updateProfile } from "firebase/auth";
 const SignUp = () => {
-  const [show, setShow] = useState(false)
-  const handleSignup = (e)=>{
-    e.preventDefault()
+  // useContext data-----------------
+  const {
+    createUserWithEmailAndPasswordFunc,
+    sendEmailVerificationFunc,
+    updateProfileFunc,
+    setLoading,
+    signOutUserFunc,
+    setUser
+  } = useContext(AuthContext);
+  const [show, setShow] = useState(false);
+  const navigate = useNavigate()
+  const handleSignup = (e) => {
+    e.preventDefault();
+    const name = e.target.name?.value;
+    const photo = e.target.photo?.value;
+
     const email = e.target.email?.value;
     const password = e.target.password?.value;
     // password validation start
@@ -17,25 +30,53 @@ const SignUp = () => {
     //   toast.error("Password must be 6 characters")
     //   return
     // }
-    const regesExp = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*()_\-+={[}\]|\\:;"'<>,.?/~`]).{8,}$/;
-    if(!regesExp.test(password)){
-      toast.error("password must be 8 charecters long and includes at least one charecter uppercase, one lowecase, and one special charecters")
-      return
+    const regesExp =
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*()_\-+={[}\]|\\:;"'<>,.?/~`]).{8,}$/;
+
+    if (!regesExp.test(password)) {
+      toast.error(
+        "password must be 8 charecters long and includes at least one charecter uppercase, one lowecase, and one special charecters"
+      );
+      return;
     }
     // password validation end
 
-
-    // firebase sign in user start
-    createUserWithEmailAndPassword(auth, email, password)
-    .then(result =>{
-      console.log(result.user)
-      toast("SignUp Successfull")
-    })
-    .catch(e => {
-      toast.error(e.message)
-    })
-  }
-// firebase sign in user end
+    // firebase sign in user start from contextApi-------------
+    createUserWithEmailAndPasswordFunc(email, password)
+      .then((result) => {
+        // add displayName and photoURL
+        updateProfileFunc(name, photo)
+          .then(() => {
+            // email varification
+            sendEmailVerificationFunc()
+              .then(() => {
+                console.log();
+                setLoading(false);
+                signOutUserFunc().then(() => {
+                  setLoading(false);
+                  toast(
+                  "Registration Successfull.please check your email inbox and varify this"
+                );
+                setUser(null);
+                  navigate("/signin")
+                });
+              })
+              .catch((e) => {
+                toast.error(e.message);
+              });
+            // toast("SignUp Successfull")
+          })
+          .catch((e) => {
+            toast.error(e.message);
+          });
+        console.log(result.user);
+        // toast("SignUp Successfull")
+      })
+      .catch((e) => {
+        toast.error(e.message);
+      });
+  };
+  // firebase sign in user end
   return (
     <div className="min-h-[96vh] flex items-center justify-center bg-gradient-to-br from-indigo-500 via-purple-600 to-pink-500 relative overflow-hidden">
       {/* Animated floating circles */}
@@ -62,7 +103,31 @@ const SignUp = () => {
             </h2>
 
             <form onSubmit={handleSignup} className="space-y-4">
-                {/* email input */}
+              {/* name input */}
+              <div>
+                <label className="block text-sm font-medium mb-1">Name</label>
+                <input
+                  type="text"
+                  name="name"
+                  placeholder="Your Name"
+                  required
+                  className="input input-bordered w-full bg-white/20 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-pink-400"
+                />
+              </div>
+              {/* photo input */}
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  photoURL
+                </label>
+                <input
+                  type="text"
+                  name="photo"
+                  placeholder="Your photoURL"
+                  required
+                  className="input input-bordered w-full bg-white/20 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-pink-400"
+                />
+              </div>
+              {/* email input */}
               <div>
                 <label className="block text-sm font-medium mb-1">Email</label>
                 <input
@@ -86,17 +151,17 @@ const SignUp = () => {
                   className="input input-bordered w-full bg-white/20 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-pink-400"
                 />
                 <span
-                  onClick={()=> setShow(!show)}
+                  onClick={() => setShow(!show)}
                   className="absolute right-[8px] top-[36px] cursor-pointer z-50"
                 >
-                  {show? <FaEye /> : <FaEyeSlash />}
+                  {show ? <FaEye /> : <FaEyeSlash />}
                 </span>
               </div>
-                {/* button input */}
+              {/* button input */}
               <button type="submit" className="my-btn">
                 Sign Up
               </button>
-                {/* already have an account input */}
+              {/* already have an account input */}
               <div className="text-center mt-3">
                 <p className="text-sm text-white/80">
                   Already have an account?{" "}

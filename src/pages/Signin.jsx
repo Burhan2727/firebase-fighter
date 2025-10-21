@@ -1,64 +1,92 @@
-import React, { useState } from "react";
+import React, { useContext, useRef, useState } from "react";
 import MyContainer from "../components/MyContainer";
-import { Link } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 import { FaEye } from "react-icons/fa";
 import { FaEyeSlash } from "react-icons/fa6";
-import { GoogleAuthProvider, signInWithEmailAndPassword, signInWithPopup, signOut } from "firebase/auth";
-import { auth } from "../firebase/firebase.config";
 import { toast } from "react-toastify";
-
-// google provider
-const googleProvider = new GoogleAuthProvider()
+import { AuthContext } from "../context/AuthContext";
 
 const Signin = () => {
-  const [user, setUser] = useState(null)
-  console.log(user)
-  const [show, setShow] = useState(false)
-    const handleSignin = (e)=>{
-      e.preventDefault();
-      const email = e.target.email.value;
-      const password = e.target.password.value;
-      // signin firebase function
-      signInWithEmailAndPassword(auth, email, password)
-      .then(result => {
-        console.log(result.user)
-        setUser(result.user)
-        toast("successfully log in")
-      })
-      .catch(e => {
-        console.log(e.code)
-        if(e.code === "auth/invalid-credential"){
-          toast.error("User already exist")
+  // sign in function receive from contextApi--------
+  const {signInWithEmailAndPasswordFunc, signInWithGooglePopupFunc, signInWithGithubPopupFunc, signOutUserFunc, sendPasswordResetEmailFunc, user, setUser, setLoading} = useContext(AuthContext)
+  console.log(user);
+  const [show, setShow] = useState(false);
+  const emailRef = useRef()
+  const location = useLocation();
+  const locationState = location.state || "/";
+  const navigate = useNavigate()
+  if(user){
+    navigate("/")
+    return
+  }
+  const handleSignin = (e) => {
+    e.preventDefault();
+    const email = e.target.email.value;
+    const password = e.target.password.value;
+    // signin firebase function from contextApi--------
+    signInWithEmailAndPasswordFunc(email, password)
+      .then((result) => {
+        setLoading(false)
+        if (!result.user.emailVerified){
+          toast.error("please varify your email!!")
+          return
         }
-        // toast.error(e.message)
+          console.log(result.user);
+        setUser(result.user);
+        toast("successfully log in");
+        navigate(locationState)
       })
-    }
-
-    // SignOut firebase function
-    const handleSignOut=()=>{
-      signOut(auth)
-      .then(()=>{
-        toast("Sign-out successful.")
-        // jokhon sign out hobe tokhon ami chai login tahole setuser(null) kore dile false hoye login input gulo dekhabe
-        setUser(null)
-      })
-      .catch(e => {
+      .catch((e) => {
+        console.log(e.code);
+        // if (e.code === "auth/invalid-credential") {
+        //   toast.error("User already exist");
+        // }
         toast.error(e.message)
+      });
+  };
+  // google signin handle onclick
+  const handleGoogleSignin = () => {
+    signInWithGooglePopupFunc()
+      .then((result) => {
+        console.log(result.user);
+        setUser(result.user);
+        setLoading(false)
+        toast("Google Signin Successful");
+        navigate(locationState)
       })
-    }
-    // google signin handle onclick
-    const handleGoogleSignin = ()=>{
-      signInWithPopup(auth, googleProvider)
-      .then(result => {
-        console.log(result.user)
-        setUser(result.user)
-        toast("Signin Successful")
+      .catch((e) => {
+        toast.error(e.message);
+      });
+  };
+  // github signin handle onclick
+  const handleGithub = () => {
+    signInWithGithubPopupFunc()
+      .then((result) => {
+        console.log(result.user);
+        setUser(result.user);
+        setLoading(false)
+        toast("Github Signin Successful");
+        navigate(locationState)
       })
-      .catch(e => {
-        
-        toast.error(e.message)
-      })
-    }
+      .catch((e) => {
+        toast.error(e.message);
+      });
+  };
+  // handle forgot password
+  const handleForgotPassword = ()=>{
+    const email = emailRef.current.value;
+    sendPasswordResetEmailFunc(email)
+    .then(()=>{
+      setLoading(false)
+      toast("password reset email sent.plese check your email inbox")
+      navigate(locationState)
+    })
+    .catch(e =>{
+      const errorCode = e.code;
+    const errorMessage = e.message;
+    toast.error(errorCode, errorMessage)
+    })
+  }
   return (
     <div className="min-h-[calc(100vh-20px)] flex items-center justify-center bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-600 relative overflow-hidden">
       {/* Animated glow orbs */}
@@ -82,17 +110,8 @@ const Signin = () => {
 
           {/* Login card */}
           <div className="w-full max-w-md backdrop-blur-lg bg-white/10 border border-white/20 shadow-2xl rounded-2xl p-8">
-              {
-                user? 
-
-                <div className="text-center space-y-3">
-                  <img className="h-20 w-20 rounded-full mx-auto" src={user?.photoURL || "https://via.photonotshow"} alt="" />
-                  <h2 className="text-xl font-semibold">{user?.displayName}</h2>
-                  <p className="text-white/80">{user?.email}</p>
-                  <button onClick={handleSignOut} className="my-btn">Sign Out</button>
-                </div> 
-
-                :<form onSubmit={handleSignin} className="space-y-5">
+            
+              <form onSubmit={handleSignin} className="space-y-5">
                 <h2 className="text-2xl font-semibold mb-2 text-center text-white">
                   Sign In
                 </h2>
@@ -102,6 +121,7 @@ const Signin = () => {
                   <input
                     type="email"
                     name="email"
+                    ref={emailRef}
                     placeholder="example@email.com"
                     className="input input-bordered w-full bg-white/20 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-blue-400"
                   />
@@ -110,19 +130,19 @@ const Signin = () => {
                 <div className="relative">
                   <label className="block text-sm mb-1">Password</label>
                   <input
-                    type={show?"text":"password"}
+                    type={show ? "text" : "password"}
                     name="password"
                     placeholder="••••••••"
                     className="input input-bordered w-full bg-white/20 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-blue-400"
                   />
                   <span
-                    onClick={()=> setShow(!show)}
+                    onClick={() => setShow(!show)}
                     className="absolute right-[8px] top-[36px] cursor-pointer z-50"
                   >
                     {show ? <FaEye /> : <FaEyeSlash />}
                   </span>
                 </div>
-
+                <button onClick={handleForgotPassword} className="hover:underline cursor-pointer" type="button">Forgot password</button>
                 <button type="submit" className="my-btn">
                   Login
                 </button>
@@ -134,7 +154,7 @@ const Signin = () => {
                   <div className="h-px w-16 bg-white/30"></div>
                 </div>
 
-                {/* Google Signin */}
+                {/* Google Signin start*/}
                 <button
                   type="button"
                   onClick={handleGoogleSignin}
@@ -147,7 +167,22 @@ const Signin = () => {
                   />
                   Continue with Google
                 </button>
-
+                {/* Google Signin end*/}
+                {/* Github Signin start*/}
+                <button
+                  type="button"
+                  onClick={handleGithub}
+                  className="flex items-center justify-center gap-3 bg-white text-gray-800 px-5 py-2 rounded-lg w-full font-semibold hover:bg-gray-100 transition-colors cursor-pointer"
+                >
+                  <img
+                    src="https://img.icons8.com/fluency/48/github.png"
+                    alt="google"
+                    className="w-5 h-5"
+                  />
+                  Continue with Github
+                </button>
+                {/* Github Signin end*/}
+                {/* dont han an account section */}
                 <p className="text-center text-sm text-white/80 mt-3">
                   Don’t have an account?{" "}
                   <Link
@@ -158,7 +193,6 @@ const Signin = () => {
                   </Link>
                 </p>
               </form>
-              }
           </div>
         </div>
       </MyContainer>
